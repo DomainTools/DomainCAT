@@ -43,7 +43,7 @@ _Note: building the container takes a bit of RAM to compile the resources for th
 
 Clone the git repository locally
 
-`$ git clone where ever the repo is` 
+`$ git clone https://github.com/DomainTools/DomainCAT.git` 
 
 Change directory to the domaincat folder
 
@@ -65,7 +65,7 @@ _Note: this project uses JupyterLab Widgets, which requires nodejs >= 12.0.0 to 
 
 Clone the git repository locally
 
-`$ git clone where ever the repo is` 
+`$ git clone https://github.com/DomainTools/DomainCAT.git` 
 
 Change directory to the domaincat folder
 
