@@ -1,0 +1,9 @@
+jupyterlab
+ipywidgets>=7.5
+networkx
+plotly==4.14.3
+tabulate
+numpy
+scipy
+matplotlib
+pandas
