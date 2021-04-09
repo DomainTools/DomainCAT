@@ -1,6 +1,10 @@
 # DomainCAT (Domain Connectivity Analysis Tool)
 
-**Domain Connectivity Analysis Tools to analyze aggregate connectivity patterns across a set of domains during security investigations**
+**Domain Connectivity Analysis Tool is used to analyze aggregate connectivity patterns across a set of domains during security investigations**
+
+This project was a collaborative effort between [myself](https://www.linkedin.com/in/jconwell/) and [Matthew Pahl](https://www.linkedin.com/in/security-sme/)
+
+## Introduction
 
 When analyzing pivots during threat hunting, most people approach it from the perspective of “what can a single 
 pivot tell you?” But often actors will set their domains up to use commodity hosting infrastructure, so the number of 
