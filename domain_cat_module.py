@@ -30,9 +30,27 @@ def show_iris_query_ui(domain_list_ui, search_hash_ui):
 
 def query_iris_rest_api(api_username: str, api_key: str, domain_list_ui, search_hash_ui):
     if len(domain_list_ui.value) > 0:
-        domain_list = domain_list_ui.value.strip().replace("\n", ",")
-        iris_query = {"api_username": api_username, "api_key": api_key, "domain": domain_list}
-        return _query_iris_rest_api(api_username, api_key, iris_query)
+        # split list of domains into groups of 100 because of API restrictions
+        results = []
+        full_domain_list = domain_list_ui.value.strip().split("\n")
+        max_domains = 100
+        start = 0
+        end = max_domains
+        for x in range(math.ceil(len(full_domain_list) / max_domains)):
+            # slice out max domains to query
+            partial_domain_list = full_domain_list[start:end]
+            # build query string
+            domain_list = ",".join(partial_domain_list)
+            iris_query = {"api_username": api_username, "api_key": api_key, "domain": domain_list}
+            # query rest api
+            print(f"...querying Iris REST API for {len(partial_domain_list)} domains")
+            iris_results = _query_iris_rest_api(api_username, api_key, iris_query)
+            # build up the set of return domain objects
+            results = results + iris_results["response"]["results"]
+            # update slice indexes
+            start = end
+            end += max_domains
+        return results
     elif len(search_hash_ui.value) > 0:
         iris_query = {"api_username": api_username, "api_key": api_key, "search_hash": search_hash_ui.value}
         return _query_iris_rest_api(api_username, api_key, iris_query)
@@ -45,7 +63,7 @@ def _query_iris_rest_api(api_username: str, api_key: str, iris_query: str):
     root_api_url = "https://api.domaintools.com/v1/iris-investigate/"
     resp = requests.post(root_api_url, data=iris_query)
     if resp.status_code != 200:
-        raise Exception('POST /iris-investigate/ {}'.format(resp.status_code))
+        raise Exception(f'POST /iris-investigate/ {resp.status_code}: {resp.text}')
     iris_results = resp.json()
     return iris_results
 
