@@ -17,10 +17,32 @@ from IPython.display import HTML, display
 import tabulate
 
 
-def query_domain_data(api_username: str, api_key: str, search_hash: str):
-    root_api_url = "https://api.domaintools.com/v1/iris-investigate/"
-    iris_query = {"api_username": api_username, "api_key": api_key, "search_hash": search_hash}
+def show_iris_query_ui(domain_list_ui, search_hash_ui):
+    lookup_ui = widgets.VBox([
+        widgets.Label(value="Enter a return delimited list of domains to lookup (no commas, no quotes)"),
+        domain_list_ui,
+        widgets.Label(value="Or..."),
+        widgets.Label(value="Enter an Iris search hassh to lookup"),
+        search_hash_ui,
+    ])
+    return lookup_ui
 
+
+def query_iris_rest_api(api_username: str, api_key: str, domain_list_ui, search_hash_ui):
+    if len(domain_list_ui.value) > 0:
+        domain_list = domain_list_ui.value.strip().replace("\n", ",")
+        iris_query = {"api_username": api_username, "api_key": api_key, "domain": domain_list}
+        return _query_iris_rest_api(api_username, api_key, iris_query)
+    elif len(search_hash_ui.value) > 0:
+        iris_query = {"api_username": api_username, "api_key": api_key, "search_hash": search_hash_ui.value}
+        return _query_iris_rest_api(api_username, api_key, iris_query)
+    else:
+        print("Domain List and Search Hash text boxes are empty. Please enter either a list of domains or search hash to lookup")
+        raise Exception("Domain List and Search Hash text boxes are empty")
+
+
+def _query_iris_rest_api(api_username: str, api_key: str, iris_query: str):        
+    root_api_url = "https://api.domaintools.com/v1/iris-investigate/"
     resp = requests.post(root_api_url, data=iris_query)
     if resp.status_code != 200:
         raise Exception('POST /iris-investigate/ {}'.format(resp.status_code))
