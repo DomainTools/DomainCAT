@@ -92,6 +92,18 @@ Run the jupyter notebook
 
 `$ jupyter lab`
 
+___
+
+# Release Notes:
+
+April 14, 2021: 
+- Added UI to search either a list of domain names or an Iris search hash
+- Added UI to enter Iris REST API username and password 
+
+April 7, 2021: 
+- Initial commit
+
+___
 
 _Plotly Bug: in the 2D visualization of the domain graph there is a weird bug in `Plotly Visualization library` where 
 if your cursor is directly over the center of a node, the node's tool tip with the domain's name will disappear and 
