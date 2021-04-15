@@ -96,6 +96,9 @@ ___
 
 # Release Notes:
 
+April 15, 2021: 
+- Bug fix: wrong json element returned when querying search hash
+
 April 14, 2021: 
 - Added UI to search either a list of domain names or an Iris search hash
 - Added UI to enter Iris REST API username and password 
