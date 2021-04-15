@@ -53,7 +53,9 @@ def query_iris_rest_api(api_username: str, api_key: str, domain_list_ui, search_
         return results
     elif len(search_hash_ui.value) > 0:
         iris_query = {"api_username": api_username, "api_key": api_key, "search_hash": search_hash_ui.value}
-        return _query_iris_rest_api(api_username, api_key, iris_query)
+        iris_results = _query_iris_rest_api(api_username, api_key, iris_query)
+        iris_results = iris_results["response"]["results"]
+        return iris_results
     else:
         print("Domain List and Search Hash text boxes are empty. Please enter either a list of domains or search hash to lookup")
         raise Exception("Domain List and Search Hash text boxes are empty")
