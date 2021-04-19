@@ -702,8 +702,10 @@ def build_3d_graph_layout(graph: "Graph", domain_list: dict):
                        symbol='circle', 
                        size=6,
                        showscale=True,
-                       color=node_risk_scores, 
+                       color=node_risk_scores,
                        colorscale=[[0.0, 'red'], [0.3, 'orange'], [0.5, 'yellow'], [1.0, 'green']],
+                       # cmin/cmax needed so plotly doesn't normalize the scores to calculate the color
+                       cmin=0, cmax=100,
                        reversescale=True,
                        line=dict(color='rgb(50,50,50)', width=0.5),
                        colorbar=dict(
@@ -789,9 +791,11 @@ def build_2d_graph_layout(graph: "Graph", domain_list: dict, get_2d_shared_pivot
         customdata=node_adjacencies,
         marker=dict(
             showscale=True,
-            colorscale=[[0.0, 'red'], [0.3, 'orange'], [0.5, 'yellow'], [1.0, 'green']],
             reversescale=True,
-            color=node_risk_scores,        
+            color=node_risk_scores,
+            colorscale=[[0.0, 'red'], [0.3, 'orange'], [0.5, 'yellow'], [1.0, 'green']],
+            # cmin/cmax needed so plotly doesn't normalize the scores to calculate the color
+            cmin=0, cmax=100,
             size=10,
             colorbar=dict(
                 thickness=15,
@@ -838,6 +842,9 @@ def build_2d_graph_layout(graph: "Graph", domain_list: dict, get_2d_shared_pivot
 
         # write selected domains to the output widget
         selected_domains = [domains[id].name for id in selected_nodes]
+        # sort domains by length, then alpha
+        selected_domains.sort()
+        selected_domains.sort(key=len, reverse=True)
         with out:
             print("Selected Domains:\n")
             for selected_domain in selected_domains:
