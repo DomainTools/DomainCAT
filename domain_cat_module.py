@@ -194,6 +194,11 @@ def build_pivot_categories(iris_results: list, config: "Config"):
     domain_list = {}
 
     for domain_json in iris_results:
+        
+        # check if domain is active or not
+        if domain_json['active'] == False and config.active_domains_only:
+            continue
+        
         # create a domain object
         domain = Domain(domain_json)
         domain_list[domain.name] = domain
@@ -846,7 +851,7 @@ def build_2d_graph_layout(graph: "Graph", domain_list: dict, get_2d_shared_pivot
         selected_domains.sort()
         selected_domains.sort(key=len, reverse=True)
         with out:
-            print("Selected Domains:\n")
+            print(f"Selected Domains: ({len(selected_domains)})\n")
             for selected_domain in selected_domains:
                 print(selected_domain)
         out.clear_output(wait=True)

@@ -105,6 +105,9 @@ There are a set of configuration settings that for the most part you shouldn't n
 
 <img src="../images/config.png" alt="Running a notebook cell" width="800"/>
 
+### config.active_domains_only (default: True)
+If this setting is `True` DomainCAT will only analyze domains that are activly registered. Domains that were taken down or expired will be ignored. If `False`, all domains returned by Iris REST API will be analyzed.
+
 ### config.longest_common_substring (default: 6)
 
 DomainCAT has a new type of pivot called `longest_common_substring`. It compares every domain name to every other 
