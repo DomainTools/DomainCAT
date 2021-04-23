@@ -96,6 +96,14 @@ ___
 
 # Release Notes:
 
+April 23, 2021:
+- Added config flag to only analyze active domains
+- Show count of selected domains
+
+April 19: 2021:
+- Bug fix to not normalize risk scores values when calculating node color
+- Mo'better sorting of selected domains
+
 April 15, 2021: 
 - Bug fix: wrong json element returned when querying search hash
 
