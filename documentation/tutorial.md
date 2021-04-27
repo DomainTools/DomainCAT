@@ -68,25 +68,52 @@ This will initialize all the code to do the connectivity analysis. You'll need t
 
 ![Running a notebook cell](../images/running_a_cell.gif)
 
+## Setting Iris REST API Credentials
+
+There are two ways you can enter your Iris REST API credentials. The first is entering them into this cell. 
+The password textbox will not show the password in clear text.
+
+<img src="../images/credentials.png" alt="Entering Iris Rest API credentials" width="800"/>
+
+Alternatively you can create a `.env` fine in the root folder of the DomainCAT project and add the following block
+to it, replacing the username and password with your own
+
+```
+# IRIS REST API CREDS
+IRIS_API_USERNAME=some_user_name
+IRIS_API_KEY=some_password
+```
+
+When the Jupyter Notebook initializes, the `dotenv` library will read the `.env` file and inject the credentials 
+into the REST API calls
+
+## Entering Domains To Query
+
+The next step is to define the list of domains to query. This cell lets you do this in one of two ways.
+
+First, you can enter the raw list of domains into the large spare textbox shown below. The domains can be 
+either new-line or comma delimited, and DomainCAT support defanged domains that use square brackets.   
+
+<img src="../images/domain_data.png" alt="Entering Domains To Query" width="800"/>
+
+The second way is to enter an Iris investigation search hash into the second text box. This hash represents
+an existing investigation in Iris and will query all the domains from the investigation. 
+
 ## Reading Domain Data From DomainTools REST API
 
 DomainCAT reads domain data by querying the 
 [DomainTools Iris Investigate REST API](https://www.domaintools.com/resources/api-documentation/iris-investigate) 
 for any investigation hash that you generate in the Iris UI.   
 
-The next code cell (shown below) has the configuration used to query the Iris REST API. You'll need to make the 
-following changes
-- `api_username`: inside the quotes paste your Iris Investigate REST API api username 
-- `api_key`: inside the quotes paste your Iris Investigate REST API api key
-- `search_hash`: inside the quotes paste your Iris investigation hash (it'll be really long). If you don't set 
-  the `search_hash` the REST API will return an error.
+The next code cell (shown below) has the configuration used to query the Iris REST API.
 
 <img src="../images/reading_data.png" alt="Running a notebook cell" width="800"/>
 
 If you run the cell (Shift+Return) DomainCAT will query the REST api using the investigation hash are return the set of 
-domains from your investigation. It will also show you the number of domains loaded into the notebook.
+domains from the list of domains you enterd or the Iris search hash. It will also show you the number of domains loaded
+into the notebook.
 
-There are a couple of other options to note:
+There are a couple of options to note:
 - `save_search_to_disk`: if you change this to `True` the search results will be saved to disk. This way you can 
   reload the set of domains from your investigation at a later point without having to query the REST API again
 - `json_file_path`: this is the path and file name used to save your search results to disk for later use

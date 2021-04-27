@@ -1,3 +1,4 @@
+import os
 import sys
 import re
 import json
@@ -15,7 +16,11 @@ from ipywidgets import interactive, HBox, VBox
 import ipywidgets as widgets
 from IPython.display import HTML, display
 import tabulate
+from dotenv import dotenv_values
 
+
+# load REST API creds from .env file
+dcat_config = dotenv_values(".env")
 
 def show_iris_query_ui(domain_list_ui, search_hash_ui):
     lookup_ui = widgets.VBox([
@@ -28,11 +33,33 @@ def show_iris_query_ui(domain_list_ui, search_hash_ui):
     return lookup_ui
 
 
-def query_iris_rest_api(api_username: str, api_key: str, domain_list_ui, search_hash_ui):
+def clean_domain_list(domain_list_ui):
+    # remove any quotes, spaces, or defanging square brackets
+    full_domain_list = domain_list_ui.value.strip().replace(' ', '').replace('"', '').replace("'", "").replace('[', '').replace(']', '')
+    # replace commas with new lines
+    full_domain_list = full_domain_list.replace(",", "\n")
+    # update the widget
+    domain_list_ui.value = full_domain_list
+    # split into array
+    return full_domain_list.split("\n")
+
+
+def get_rest_api_creds(api_username_ui, api_pw_ui):
+    api_username = api_username_ui.value
+    if len(api_username) == 0:
+        api_username = dcat_config["IRIS_API_USERNAME"]
+    api_key = api_pw_ui.value
+    if len(api_key) == 0:
+        api_key = dcat_config["IRIS_API_KEY"]
+    return api_username, api_key
+
+
+def query_iris_rest_api(api_username_ui, api_pw_ui, domain_list_ui, search_hash_ui):
+    api_username, api_key = get_rest_api_creds(api_username_ui, api_pw_ui)
     if len(domain_list_ui.value) > 0:
         # split list of domains into groups of 100 because of API restrictions
         results = []
-        full_domain_list = domain_list_ui.value.strip().split("\n")
+        full_domain_list = clean_domain_list(domain_list_ui)
         max_domains = 100
         start = 0
         end = max_domains

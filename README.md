@@ -96,6 +96,12 @@ ___
 
 # Release Notes:
 
+April 27, 2021:
+- Added support for `dotenv` to store REST API credentials in a `.env` file
+- Added logic to support
+  - comma delimited list of domains
+  - domains defanged with square brackets
+
 April 23, 2021:
 - Added config flag to only analyze active domains
 - Show count of selected domains
