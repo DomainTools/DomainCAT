@@ -1,6 +1,8 @@
 # DomainCAT (Domain Connectivity Analysis Tool)
 
-**Domain Connectivity Analysis Tool is used to analyze aggregate connectivity patterns across a set of domains during security investigations**
+## "See Connections Between Domains Right Meow"
+
+**The Domain Connectivity Analysis Tool is used to analyze aggregate connectivity patterns across a set of domains during security investigations**
 
 This project was a collaborative effort between [myself](https://www.linkedin.com/in/jconwell/) and [Matthew Pahl](https://www.linkedin.com/in/security-sme/)
 
