@@ -98,6 +98,10 @@ ___
 
 # Release Notes:
 
+August 24, 2021:
+- Adding a way to remove domains in the graph that you aren't interested in (look at the bottom of the notebook)
+- Refactor of the backend data structures to be a bit more efficient
+
 April 27, 2021:
 - Added support for `dotenv` to store REST API credentials in a `.env` file
 - Added logic to support
