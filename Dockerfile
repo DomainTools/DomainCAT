@@ -12,10 +12,10 @@ RUN apt-get install -y gcc g++ make
 RUN node --version
 RUN npm --version
 
-# copy files 
+# copy dependency files
 RUN mkdir src
 WORKDIR src/
-COPY . .
+COPY requirements.txt .
 
 # instsall Jupyter, domaincat requirements, and widget extensions
 RUN pip3 install -r requirements.txt
@@ -26,6 +26,9 @@ RUN jupyter labextension install plotlywidget@4.14.3 --no-build
 RUN jupyter lab build
 RUN npm cache clean --force
 RUN unset NODE_OPTIONS
+
+# Rest of Files copied
+COPY . .
 
 # Run jupyter lab
 CMD ["jupyter", "lab", "--port=9999", "--no-browser", "--ip=0.0.0.0", "--allow-root"]

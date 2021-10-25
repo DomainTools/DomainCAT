@@ -97,6 +97,14 @@ def _query_iris_rest_api(api_username: str, api_key: str, iris_query: str):
     return iris_results
 
 
+def remove_domains_from_graph(graph, remove_domains_ui):
+    domains = clean_domain_list(remove_domains_ui)
+    for domain in domains:
+        if graph.has_node(domain):
+            graph.remove_node(domain)
+    return graph
+
+
 class Config(object):
     """ Little helper class to hold all the config values"""
 
@@ -105,14 +113,14 @@ class Domain(object):
     """ Little helper class to hold the domain name and risk score
     """
     def __init__(self, domain_json):
-        self.index = None
         self.json = domain_json
         self.name = domain_json["domain"]
         self.risk_score = domain_json["domain_risk"]['risk_score']
         self.pivot_categories = {}
+        self.label=f"{self.name} ({self.risk_score})"
     
     def __str__(self):
-        return f"index: {self.index}, name: {self.name}, risk: {self.risk_score}"
+        return f"name: {self.name}, risk: {self.risk_score}"
     
     def __repr__(self):
         return str(self)
@@ -181,44 +189,42 @@ def build_domain_pivot_graph(iris_results: list, config: "Config"):
     builds the graph object of how each of the domains in the query are connected to each other"""
     
     # parse the Iris API Result to build the pivot data structure
-    pivot_categories, domain_list = build_pivot_categories(iris_results, config)
+    graph, pivot_categories = init_local_pivot_graph(iris_results, config)
 
     # normalize registrar pivots (see note in function comments)
     #if "registrar" in pivot_categories and config.normalize_registrars:
     #    normalize_similar_registrars(pivot_categories["registrar"])
 
     # create pivots for longest common substrings
-    pivot_on_matching_substrings(pivot_categories, domain_list, config)
+    pivot_on_matching_substrings(graph, pivot_categories, config)
 
     # trim pivots from graph that have less than the set count threshold or contain all domains
-    trim_pivots(pivot_categories, len(domain_list), config)
+    trim_pivots(pivot_categories, len(graph.nodes), config)
 
     # trim unconnected domains and domains with only a create date pivot
-    domain_list, trimmed_unconnected_domains = trim_unconnected_domains(
-        pivot_categories, domain_list, config)
-    domain_list, trimmed_create_date_domains = trim_domains_with_only_create_date_pivot(
-        pivot_categories, domain_list)
+    trimmed_unconnected_domains = trim_unconnected_domains(graph, pivot_categories, config)
+    trimmed_create_date_domains = trim_domains_with_only_create_date_pivot(graph, pivot_categories)
 
     print(f"{len(trimmed_unconnected_domains)} "
           f"domains trimmed because they were not connected to other domains")
     print(f"{len(trimmed_create_date_domains)} "
           f"domains trimmed because create_date was the only pivit")
-    print(f"{len(domain_list)} domains in pivot structure \n")
+    print(f"{len(graph.nodes)} domains in pivot structure \n")
 
     # build the graph structure based on the domain pivots
-    graph = build_domain_graph(domain_list, pivot_categories, config)
-    return (pivot_categories,
-            domain_list,
-            graph,
+    graph = build_domain_graph(graph, pivot_categories, config)
+    return (graph, 
+            pivot_categories,
             {"unconnected": trimmed_unconnected_domains,
              "create_date": trimmed_create_date_domains})
 
 
-def build_pivot_categories(iris_results: list, config: "Config"):
+def init_local_pivot_graph(iris_results: list, config: "Config"):
     """ Collect pivot categories found in result set ("ssl_hash" for example)"""
+    # init empty graph
+    graph = nx.Graph()
+    # init pivot categories dict
     pivot_categories = {}
-    # collect a list of all domains
-    domain_list = {}
 
     for domain_json in iris_results:
         
@@ -228,7 +234,9 @@ def build_pivot_categories(iris_results: list, config: "Config"):
         
         # create a domain object
         domain = Domain(domain_json)
-        domain_list[domain.name] = domain
+
+        # add domain node to graph
+        graph.add_node(domain.name, domain=domain)
 
         append_value_with_count(pivot_categories, 'adsense', domain_json, domain, config)
         append_value_with_count(pivot_categories, 'google_analytics', domain_json, domain, config)
@@ -267,7 +275,7 @@ def build_pivot_categories(iris_results: list, config: "Config"):
             append_value_with_count(pivot_categories, 'domain', mx_json, domain, config, "mx_domain")
             append_values_with_counts(pivot_categories, 'ip', mx_json, domain, config, "mx_ip")
             # mx priority might be interesting at some point to node stringth  
-    return pivot_categories, domain_list
+    return graph, pivot_categories
     
 
 def append_value(pivot_categories: dict,
@@ -276,7 +284,7 @@ def append_value(pivot_categories: dict,
                  domain: "Domain",
                  config: "Config",
                  new_pivot_category: str = None):
-    # check if pivot is in dictionary
+    # check if pivot is in domain json
     if pivot_category in json_data:
         pivot_value = str(json_data[pivot_category]).strip()
 
@@ -292,18 +300,18 @@ def append_value_with_count(pivot_categories: dict,
                             domain: "Domain",
                             config: "Config",
                             new_pivot_category: str = None):
-    # check if pivot is in dictionary
+    # check if pivot is in domain json
     if pivot_category in json_data:
         if isinstance(json_data[pivot_category], dict): 
             pivot_value = str(json_data[pivot_category]["value"]).strip()
-            pivot_count = json_data[pivot_category]["count"]
+            global_pivot_count = json_data[pivot_category]["count"]
 
             # trim pivots that are above the threshold (except create_date)
-            if pivot_count < config.count_threshold or pivot_category == "create_date":
+            if global_pivot_count < config.global_count_threshold or pivot_category == "create_date":
                 # check we have a value to add
-                if len(pivot_value) > 0 and pivot_count > 0:
+                if len(pivot_value) > 0 and global_pivot_count > 0:
                     _append_value_to_pivot(pivot_categories, pivot_category, pivot_value,
-                                           pivot_count, domain, config, new_pivot_category)
+                                           global_pivot_count, domain, config, new_pivot_category)
             
             
 def append_values_with_counts(pivot_categories: dict,
@@ -312,22 +320,22 @@ def append_values_with_counts(pivot_categories: dict,
                               domain: "Domain",
                               config: "Config",
                               new_pivot_category: str = None):
-    # check if pivot is in dictionary
+    # check if pivot is in domain json
     if pivot_category in json_data:
         for pivot in json_data[pivot_category]:
             pivot_value = str(pivot["value"]).strip()
-            pivot_count = pivot["count"]
+            global_pivot_count = pivot["count"]
                         
             # check if we want to add this value
-            if len(pivot_value) > 0 and pivot_count > 0 and pivot_count < config.count_threshold:
+            if len(pivot_value) > 0 and global_pivot_count > 0 and global_pivot_count < config.global_count_threshold:
                 _append_value_to_pivot(pivot_categories, pivot_category, pivot_value,
-                                       pivot_count, domain, config, new_pivot_category)
+                                       global_pivot_count, domain, config, new_pivot_category)
 
 
 def _append_value_to_pivot(pivot_categories: dict,
                            pivot_category: str,
                            pivot_value: str,
-                           pivot_count: int,
+                           global_pivot_count: int,
                            domain: "Domain",
                            config: "Config",
                            new_pivot_category: str = None):
@@ -345,7 +353,7 @@ def _append_value_to_pivot(pivot_categories: dict,
 
     # make sure we have the pivot value set
     if pivot_value not in pivot_categories[pivot_category]:
-        pivot_categories[pivot_category][pivot_value] = PivotValue(pivot_value, pivot_count)
+        pivot_categories[pivot_category][pivot_value] = PivotValue(pivot_value, global_pivot_count)
 
     # add domain to the pivot domain array
     pivot_categories[pivot_category][pivot_value].domains.add(domain.name)
@@ -414,25 +422,24 @@ def normalize_similar_registrars(registrar_pivots: dict):
 #                     print(f"Merged registrar {reg_pop} into {reg_keep}")
 
 
-def pivot_on_matching_substrings(pivot_categories: dict, domain_list: dict, config: "Config"):
+def pivot_on_matching_substrings(graph: "Graph", pivot_categories: dict, config: "Config"):
     """Create pivots between domains that share a common substring of
     `config.longest_common_substring` chars long.
     
     Note: SequenceMatcher has some known issues with not finding the longest match in very long
     strings, but does a pretty good job with shorter strings such as domain names.
     https://stackoverflow.com/questions/18715688/find-common-substring-between-two-strings
-    """    
-    matches = {}
-    domains = list(domain_list.values())
+    """
+    domains = list(graph.nodes)
     for x in range(len(domains)):
-        domain1 = domains[x]
+        domain1 = graph.nodes[domains[x]]["domain"]
         string1 = domain1.name.split('.')[0]
         # pull out substrings to ignore
         if config.ignore_substrings and len(config.ignore_substrings) > 0:
             for ignore in config.ignore_substrings:
                 string1 = string1.replace(ignore, "")
         for y in range(x+1, len(domains)):
-            domain2 = domains[y]
+            domain2 = graph.nodes[domains[y]]["domain"]
             string2 = domain2.name.split('.')[0]
             # pull out substrings to ignore
             if config.ignore_substrings and len(config.ignore_substrings) > 0:
@@ -444,10 +451,6 @@ def pivot_on_matching_substrings(pivot_categories: dict, domain_list: dict, conf
             longest_match = string1[match.a: match.a + match.size]
             # check if the matching substring is long enough
             if len(longest_match) >= config.longest_common_substring:
-                if longest_match not in matches:
-                    matches[longest_match] = set()
-                matches[longest_match].add(domain1)
-                matches[longest_match].add(domain2)
                 # add pivots
                 _append_value_to_pivot(
                     pivot_categories, 
@@ -459,7 +462,6 @@ def pivot_on_matching_substrings(pivot_categories: dict, domain_list: dict, conf
                     "longest_common_substring",
                     longest_match, None,
                     domain2, config)
-    return matches     
 
 
 def trim_pivots(pivot_categories: dict, domain_count: int, config: "Config"):
@@ -479,7 +481,7 @@ def trim_pivots(pivot_categories: dict, domain_count: int, config: "Config"):
                 # check for pivots with less than the threshold value
                 del pivot_category[pivot_value]
                 del_count += 1
-            elif len(pivot_category[pivot_value].domains) == domain_count:
+            elif len(pivot_category[pivot_value].domains) >= domain_count:
                 # check for pivots with all domains in them
                 del pivot_category[pivot_value]
                 if config.print_debug_output:
@@ -490,10 +492,10 @@ def trim_pivots(pivot_categories: dict, domain_count: int, config: "Config"):
                   f"pivots from {pivot_category_key}")
 
             
-def trim_unconnected_domains(pivot_categories: dict, domain_list: dict, config: "Config"):
+def trim_unconnected_domains(graph: "Graph", pivot_categories: dict, config: "Config"):
     """ Remove any domains that have no shared connection to any othe domain
     """
-    if config.print_debug_output: print(f"{len(domain_list)} domains in Iris result set")
+    if config.print_debug_output: print(f"{len(graph.nodes)} domains in Iris result set")
     connected_domains = set()
     for pivot_category_key in pivot_categories:
         pivot_category = pivot_categories[pivot_category_key]
@@ -501,46 +503,44 @@ def trim_unconnected_domains(pivot_categories: dict, domain_list: dict, config: 
             pivot_domains = pivot_category[pivot_value].domains
             connected_domains = connected_domains.union(pivot_domains)
 
-    # collect the set of all domains that are connected in some manner
-    domain_list_tmp = {}
-    for domain_name in connected_domains:
-        domain_list_tmp[domain_name] = domain_list[domain_name]
-        # remove domain. domain_list becomes the set of all disconnected domains
-        domain_list.pop(domain_name)
+    # get the set of domains that are not connected
+    domains = set(graph.nodes)
+    lonely_domains = domains.difference(connected_domains)
+            
+    # remove unconnected domains
+    for domain in lonely_domains:
+        graph.remove_node(domain)        
 
     if config.print_debug_output: 
-        print(f"{len(domain_list_tmp)} domains are interconnected")
-        print(f"{len(domain_list)} domains are unconnected")        
+        print(f"{len(connected_domains)} domains are interconnected")
+        print(f"{len(lonely_domains)} domains are unconnected")        
         print("Unconnected domains removed from graph:")
-        for domain in domain_list:
-            print(f"  {domain_list[domain].name}: risk score {domain_list[domain].risk_score}")
+        for domain in lonely_domains:
+            print(f"  {domain}")
     
-    return domain_list_tmp, list(domain_list.values())
+    return lonely_domains
 
 
-def trim_domains_with_only_create_date_pivot(pivot_categories: dict, domain_list: dict):
+def trim_domains_with_only_create_date_pivot(graph: "Graph", pivot_categories: dict):
     """ if a domain ONLY has a create_date pivot, then that isn't a very good indicator of
     connectedness."""
     # identify domains to trim
-    trimmed_domains = set()
-    for domain_name in domain_list:
-        domain = domain_list[domain_name]
+    trimmed_domains = []
+    for domain_name in graph.nodes:
+        domain = graph.nodes[domain_name]["domain"]
         if len(domain.pivot_categories) == 1 and "create_date" in domain.pivot_categories:
             trimmed_domains.add(domain)
+            # remove domain from graph and remove it from the main pivot_categories data structure
+            graph.remove_node(domain_name)
             
-    # remove trimmed domains from domain_list
-    for trimmed_domain in trimmed_domains:
-        domain_list.pop(trimmed_domain.name)
-        
-        # remove trimmed domain from the main pivot_categories data structure
-        domain_create_date = trimmed_domain.pivot_categories["create_date"][0]
-        pivot_categories["create_date"][domain_create_date].remove(trimmed_domain.name)
-        if len(pivot_categories["create_date"][domain_create_date]) == 0:
-            pivot_categories["create_date"].pop(domain_create_date)
-        if len(pivot_categories["create_date"]) == 0:
-            pivot_categories.pop("create_date")
-        
-    return domain_list, list(trimmed_domains)
+            domain_create_date = domain.pivot_categories["create_date"][0]
+            pivot_categories["create_date"][domain_create_date].remove(domain_name)
+            if len(pivot_categories["create_date"][domain_create_date]) == 0:
+                pivot_categories["create_date"].pop(domain_create_date)
+            if len(pivot_categories["create_date"]) == 0:
+                pivot_categories.pop("create_date")
+
+    return trimmed_domains
 
 
 def get_pivot_connection_weight(pivot_category: str,
@@ -574,38 +574,27 @@ def get_pivot_connection_weight(pivot_category: str,
     return 1
 
 
-def build_domain_graph(domain_list: dict, pivot_categories: dict, config: "Config"):
-    # init empty graph
-    graph = nx.Graph()
-
-    # add nodes
-    for index, domain in enumerate(domain_list.values()):
-        domain.index = index
-        graph.add_node(domain.index,
-                       risk_score=domain.risk_score,
-                       alpha=1.0,
-                       label=f"{domain.name} ({domain.risk_score})")
-
-    # add edges
+def build_domain_graph(graph: "Graph", pivot_categories: dict, config: "Config"):
+    # The graph in initialized with all it's nodes. Now we need to connect all the nodes
+    # with each local pivot in the pivot_categories dict
     edge_count = 0
-    for category in pivot_categories:        
+    for category in pivot_categories:
         for pivot_value in pivot_categories[category]:
-            pv_obj = pivot_categories[category][pivot_value]
-            domains = list(pv_obj.domains)
+            pivot = pivot_categories[category][pivot_value]
+            pivot_domains = list(pivot.domains)
 
-            # get the edge weight and create edges 
-            weight = get_pivot_connection_weight(
-                category, pv_obj.pivot_count, len(pv_obj.domains), config)
+            # for each pair of domains in pivot, get the edge weight and create edge
+            weight = get_pivot_connection_weight(category, pivot.pivot_count, len(pivot_domains), config)
             if weight > 0:
-                for x in range(len(domains)):
-                    for y in range(x+1, len(domains)):
-                        u = domain_list[domains[x]].index
-                        v = domain_list[domains[y]].index
+                for x in range(len(pivot_domains)):
+                    for y in range(x+1, len(pivot_domains)):
+                        d1 = pivot_domains[x]
+                        d2 = pivot_domains[y]
                         edge_count += 1
-                        if graph.has_edge(u, v):
-                            graph[u][v]['relationship'].add(weight, category)
+                        if graph.has_edge(d1, d2):
+                            graph[d1][d2]['relationship'].add(weight, category)
                         else:
-                            graph.add_edge(u, v, relationship=DomainRelationship(weight, category))
+                            graph.add_edge(d1, d2, relationship=DomainRelationship(weight, category))
 
     # now that all edges are added, set the weight attribute with the adjusted weight
     for edge in graph.edges:
@@ -616,12 +605,12 @@ def build_domain_graph(domain_list: dict, pivot_categories: dict, config: "Confi
     return graph
 
 
-def calc_pivot_stats(pivot_categories: dict, domain_list: dict):
+def calc_pivot_stats(graph: "Graph", pivot_categories: dict):
     from IPython.display import HTML, display
     import tabulate
 
     # calc the max number of edges possible for this set of domains
-    max_edge_count = get_edge_count(len(domain_list))
+    max_edge_count = get_edge_count(len(graph.nodes))
 
     # collect counts for each pivot category
     category_domain_counts = {}
@@ -646,7 +635,7 @@ def calc_pivot_stats(pivot_categories: dict, domain_list: dict):
                "avg domains per pivot",
                "# of connections"]
     table = []
-    total_domains = len(domain_list)
+    total_domains = len(graph.nodes)
     for category_key in category_domain_counts:
         cat_pivot_count = len(pivot_categories[category_key])
         if cat_pivot_count > 0:
@@ -664,7 +653,7 @@ def calc_pivot_stats(pivot_categories: dict, domain_list: dict):
                           round(avg_domains, 2),
                           f"{edge_count} ({percent_of_total_edges}%)"])
 
-    print(f"{len(domain_list)} Domains in Pivot Structure")
+    print(f"{len(graph.nodes)} Domains in Pivot Structure")
     display(HTML(tabulate.tabulate(table, headers=headers, tablefmt='html')))    
 
 
@@ -689,24 +678,22 @@ def calc_viz_layout(layout: str, graph: "Graph", dimension: int):
     raise Exception("invalid layout choice")
     
     
-def build_3d_graph_layout(graph: "Graph", domain_list: dict):
+def build_3d_graph_layout(graph: "Graph"):
     """ Build the graph layout based on the specified algorithm and get the node positions
     in xyz dimensions"""
     pos = calc_viz_layout("kk_to_fr", graph, 3)
 
     node_labels, node_risk_scores, Xn, Yn, Zn = [], [], [], [], []
-    domain_indexes = sorted([domain.index for domain in domain_list.values()])
-    for k in domain_indexes:
+    for name in graph.nodes:
         # build x,y,z coordinates data structure for nodes
-        Xn.append(pos[k][0])
-        Yn.append(pos[k][1])
-        Zn.append(pos[k][2])
+        Xn.append(pos[name][0])
+        Yn.append(pos[name][1])
+        Zn.append(pos[name][2])
 
         # get domain colors by risk score
-        node = graph.nodes[k]
-        node_labels.append(node['label'])
-        # get the domain risk score
-        node_risk_scores.append(node['risk_score'])
+        domain = graph.nodes[name]["domain"]
+        node_labels.append(domain.label)
+        node_risk_scores.append(domain.risk_score)
 
     # build x,y,z coordinates data structure for edges
     Xe, Ye, Ze = [], [], []
@@ -770,12 +757,12 @@ def build_3d_graph_layout(graph: "Graph", domain_list: dict):
     return fig
 
 
-def build_2d_graph_layout(graph: "Graph", domain_list: dict, get_2d_shared_pivots: "function"):
+def build_2d_graph_layout(graph: "Graph", get_2d_shared_pivots: "function"):
     """ build the graph layout based on the specified algorithm and get the node positions
     in xy dimensions"""
     pos = calc_viz_layout("kk_to_fr", graph, 2)
     # pos = calc_viz_layout("fr_to_kk", g, 2)
-
+    
     # build edge data
     edge_x, edge_y = [], []
     for e in graph.edges():
@@ -799,18 +786,17 @@ def build_2d_graph_layout(graph: "Graph", domain_list: dict, get_2d_shared_pivot
 
     # build node data
     node_adjacencies, node_risk_scores, node_text, node_x, node_y = [], [], [], [], []
-    domains = sorted(domain_list.values(), key=lambda domain: domain.index)
-    for domain in domains:
-        x, y = pos[domain.index]
+    names = list(graph.nodes)
+    for name in names:
+        domain = graph.nodes[name]["domain"]
+        x, y = pos[name]
         node_x.append(x)
         node_y.append(y)
         # get the domain's connected nodes
-        neighbors = list(graph.neighbors(domain.index))
+        neighbors = list(graph.neighbors(name))
         node_adjacencies.append(neighbors)
-        # get the domain text
-        domain_name = domain.name    
-        risk_score = domain.risk_score
-        node_text.append(f'{domain_name}: risk {risk_score}, connections {len(neighbors)}')
+        # get the node text
+        node_text.append(f'{name}: risk {domain.risk_score}, connections {len(neighbors)}')
         # get the domain risk score
         node_risk_scores.append(domain.risk_score)
 
@@ -852,39 +838,45 @@ def build_2d_graph_layout(graph: "Graph", domain_list: dict, get_2d_shared_pivot
     
     # handle selection of domains
     def node_selection_fn(trace, points, selector):
-        update_selected_nodes(points.point_inds)
+        selected_domains = [names[idx] for idx in points.point_inds]
+        update_selected_domains(selected_domains)
     
     # handle node click events
     def node_click_fn(trace, points, selector):        
         if len(points.point_inds) > 1:
             print(f"node_click passed in more than 1 point: {points.point_inds}")
+        
+        # clear the old selected points
         trace.selectedpoints = []
         if len(points.point_inds) == 0:
             return
-        new_points = []
-        for id in points.point_inds:
-            new_selected = [id] + trace.customdata[id]            
-            new_points = new_points + new_selected
-        trace.selectedpoints = new_points
-        update_selected_nodes(trace.selectedpoints)
         
-    def update_selected_nodes(selected_nodes):
-        if len(selected_nodes) == 0:
-            return
+        # get the list of selected domain names
+        selected_domains = [names[idx] for idx in points.point_inds]
+        for id in points.point_inds:
+            selected_domains = selected_domains + trace.customdata[id]
 
-        # write selected domains to the output widget
-        selected_domains = [domains[id].name for id in selected_nodes]
+        # set the new selected points
+        # don't like having to loop in a loop to get the domain index, but I don't know a better way
+        trace.selectedpoints = points.point_inds + [names.index(name) for name in trace.customdata[id]]
+        
+        update_selected_domains(selected_domains)
+        
+    def update_selected_domains(selected_domains):
+        if len(selected_domains) == 0:
+            return
+                
         # sort domains by length, then alpha
-        selected_domains.sort()
         selected_domains.sort(key=len, reverse=True)
         with out:
+            # write selected domains to the output widget
             print(f"Selected Domains: ({len(selected_domains)})\n")
             for selected_domain in selected_domains:
                 print(selected_domain)
         out.clear_output(wait=True)
         
         # calc pivots selected domains have in common
-        get_2d_shared_pivots(domain_list, selected_domains)
+        get_2d_shared_pivots(graph, selected_domains)
         
     # event handler for node selection
     fig.data[1].on_selection(node_selection_fn)        
@@ -892,21 +884,15 @@ def build_2d_graph_layout(graph: "Graph", domain_list: dict, get_2d_shared_pivot
     fig.data[1].on_click(node_click_fn)
 
     # Create a table FigureWidget that updates the list of selected domains
-    cols = [
-        [domain.name for domain in domain_list.values()],
-        [domain.risk_score for domain in domain_list.values()]
-    ]
-
     out = widgets.Output(layout={'border': '1px solid black'})
-
     domain_ui = widgets.VBox((fig, out))
     return domain_ui
     
 
-def get_shared_pivots(domain_list: dict, selected_domains: list):
+def get_shared_pivots(graph: "Graph", selected_domains: list):
     shared_pivots = {}
-    for id in selected_domains:
-        domain = domain_list[id]
+    for name in selected_domains:
+        domain = graph.nodes[name]["domain"]
         for cat in domain.pivot_categories:
             for cat_value in domain.pivot_categories[cat]:
                 key = f"{cat}: {cat_value}"

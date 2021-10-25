@@ -72,7 +72,9 @@ Build the jupyter notebook container
 
 Run the jupyter notebook
 
-`$ docker run -p 9999:9999 --name domaincat domaincat`
+`$ docker run -p 9999:9999 -v $(PWD)/data:/src/data --name domaincat domaincat`
+
+Mounting the data directory as a volume allows you to add new files to the container without having to rebuild it.
 
 ## Installation Steps: Manual (cross your fingers)
 
@@ -111,6 +113,10 @@ ___
 
 October 25, 2021:
 - Initial support for InfraCAT
+
+August 24, 2021:
+- Adding a way to remove domains in the graph that you aren't interested in (look at the bottom of the notebook)
+- Refactor of the backend data structures to be a bit more efficient
 
 April 27, 2021:
 - Added support for `dotenv` to store REST API credentials in a `.env` file

@@ -18,3 +18,10 @@
 when looking at domains that are probably realted and created over a short period of time, it would be useful to have some viz that shows / groups the pivots per create date. That way you could see stuff like on day 1 TLD1 and regustrar1 were used, then day two TLD1 and registrar2 were used, then day 3 TLD2 and registrar2 were used. That kind of thing
 
 Given a selection of domains, show what attributes they are NOT connected on
+
+date range of domains
+timeline view that shows how tight or loosely connected the domains are for each day or week
+
+auto identify the clusters and show the pivot table for each cluster
+
+auto discovery substrings
