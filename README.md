@@ -22,7 +22,15 @@ up their malicious infrastructure. These can be considered behavioral choices.
 All of these decisions, together, makeup part of that actor’s infrastructure tools, tactics and procedures (TTPs), 
 and we can analyze them as a whole to look for patterns across a set of domains. 
 
-DomainCAT is a tool written in Jupyter Notebooks, a web-based interactive environment that lets you combine text, 
+### But wait there's more
+
+### Introducing InfraCAT
+
+What if instead of nodes being domains, they were the infrastructure and the edges were the connected domains? That was 
+the thought process with InfraCAT. By seeing clusters of infrastructure, you can see tightly coupled groups of domains 
+based on the infrastructure they use. 
+
+DomainCAT and InfraCAT are tools written in Jupyter Notebooks, a web-based interactive environment that lets you combine text, 
 code, data, and interactive visualizations into your threat hunting toolbelt. The tool analyzes aggregate 
 connectivity patterns across a set of domains looking at every pivot for every domain, asking; what are the shared 
 pivots across these domains, how many shared pivots between each domain, do they have a small pivot count or a really 
@@ -36,6 +44,9 @@ connected all the domains in an Iris search are to each other.
 
 #### 2D visualization of domain to domain connection
 ![domain_graph2d.png](images/2d_zoom.gif "segment")
+
+#### 3d visualization of infra to infra connection
+![3dinfra](images/3d_infra.gif)
 
 ## DomainCat Tutorial
 
@@ -99,6 +110,9 @@ Run the jupyter notebook
 ___
 
 # Release Notes:
+
+October 25, 2021:
+- Initial support for InfraCAT
 
 August 24, 2021:
 - Adding a way to remove domains in the graph that you aren't interested in (look at the bottom of the notebook)
