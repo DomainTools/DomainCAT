@@ -83,7 +83,7 @@ def query_iris_rest_api(api_username_ui, api_pw_ui, domain_list_ui, search_hash_
             print(f"...querying Iris REST API for {len(partial_domain_list)} domains")
             iris_results = api.iris_investigate(**iris_query)
             # build up the set of return domain objects
-            results += iris_results.data()["response"]["results"]
+            results += iris_results.response().get('results', {})
             # update slice indexes
             start = end
             end += max_domains
@@ -91,8 +91,8 @@ def query_iris_rest_api(api_username_ui, api_pw_ui, domain_list_ui, search_hash_
     elif len(search_hash_ui.value) > 0:
         iris_query = {"search_hash": search_hash_ui.value}
         iris_results = api.iris_investigate(**iris_query)
-        print(iris_results.status)
-        # iris_results = iris_results["response"]["results"]
+        # print(iris_results.status)
+        iris_results = iris_results.response().get('results', {})
         return iris_results
     else:
         print(
@@ -319,6 +319,50 @@ def get_pivots(data_obj, name, return_data=None, count=0, pivot_threshold=500):
         return return_data
 
 
+def build_infra_graph(iris_results: list, config: "Config"):
+    graph = nx.Graph()
+    pv_dict = {}
+    config.domain_risk_dict = {}
+    for domain in iris_results:
+        if domain["domain"] not in config.domain_risk_dict:
+            config.domain_risk_dict[domain["domain"]] = domain.get("domain_risk", {}).get("risk_score", 0)
+        # GET PIVOTS
+        nps = get_pivots(domain, "", pivot_threshold=config.pivot_threshold)
+        pv_list = []
+        for p in nps:
+            if p[0] not in config.exclude_list:
+                pv_list.append("{}_{}".format(p[0], p[1][0]))
+        # CREATE POSSIBLE NODES AND POSSIBLE EDGES
+        x = itertools.combinations(pv_list, 2)
+        for g in x:
+            if "{}:::{}".format(g[0], g[1]) in pv_dict:
+                if domain["domain"] not in pv_dict["{}:::{}".format(g[0], g[1])]:
+                    pv_dict["{}:::{}".format(g[0], g[1])].append(domain["domain"])
+            else:
+                pv_dict["{}:::{}".format(g[0], g[1])] = [domain["domain"]]
+
+    b_pv_list = []
+    my_set = set()
+
+    # FILTER OUT EDGES THAT DON'T MEET THRESHOLD
+    for k, v in pv_dict.items():
+        if len(v) > config.edge_threshold:
+            a = k.split(":::")
+            b_pv_list.append([a[0], a[1], v, len(v)])
+            my_set.add(a[0])
+            my_set.add(a[1])
+            # print(k, v, len(v))
+
+    # CREATE NODES
+    for m in my_set:
+        graph.add_node(m, color='blue', size=0)
+
+    # CREATE EDGES
+    for m in b_pv_list:
+        graph.add_edge(m[0], m[1], domains=m[2], length=m[3])
+    return graph, config
+
+
 def build_pair_infra_graph(iris_results: list, config: "Config"):
     graph = nx.Graph()
     pv_dict = {}
@@ -393,6 +437,7 @@ def calc_viz_layout(layout: str, graph: "Graph", dimension: int):
         pos = nx.layout.spring_layout(graph, dim=dimension)
         return nx.layout.kamada_kawai_layout(graph, pos=pos, dim=dimension)
     raise Exception("invalid layout choice")
+
 
 def average_risk_score(domain_list, domain_dict):
     total = sum(domain_dict[d] for d in domain_list)
@@ -477,7 +522,7 @@ def build_3d_graph_layout(graph: "Graph", config):
                 title='')
 
     layout = go.Layout(
-        title=f"Graph of interconnected domains ({len(node_labels)} domains)",
+        title=f"Graph of interconnected infrastructure ({len(node_labels)} infra nodes)",
         width=1000, height=1000,
         showlegend=False,
         scene=dict(xaxis=dict(axis), yaxis=dict(axis), zaxis=dict(axis)),
@@ -520,7 +565,7 @@ def build_3d_graph_layout(graph: "Graph", config):
         selected_domains.sort(key=len, reverse=True)
         with out:
             # write selected domains to the output widget
-            print(f"Selected Domains: ({len(selected_domains)})\n")
+            print(f"Selected Infra: ({len(selected_domains)})\n")
             for selected_domain in selected_domains:
                 print(selected_domain)
         out.clear_output(wait=True)
@@ -570,7 +615,7 @@ def build_2d_graph_layout(graph: "Graph", config):
     node_adjacencies, node_risk_scores, node_text, node_labels, node_size, node_x, node_y = [], [], [], [], [], [], []
     names = list(graph.nodes)
     for name in graph.nodes(data=True):
-        domain = graph.nodes[name[0]]["domain"]
+        domain = graph.nodes[name[0]]
         x, y = pos[name[0]]
         node_x.append(x)
         node_y.append(y)
@@ -619,7 +664,7 @@ def build_2d_graph_layout(graph: "Graph", config):
     fig = go.FigureWidget(
         [edge_trace, node_trace],
         layout=go.Layout(
-            title=f'Graph of interconnected intrastructure ({len(node_labels)} infra nodes)',
+            title=f'Graph of interconnected infrastructure ({len(node_labels)} infra nodes)',
             titlefont_size=16,
             showlegend=False,
             hovermode='closest',
