@@ -23,7 +23,7 @@ RUN export NODE_OPTIONS=--max-old-space-size=4096
 RUN jupyter labextension install jupyterlab-plotly@4.14.3 --no-build
 RUN jupyter labextension install @jupyter-widgets/jupyterlab-manager --no-build
 RUN jupyter labextension install plotlywidget@4.14.3 --no-build
-RUN jupyter lab build
+RUN jupyter lab build --dev-build=False --minimize=False
 RUN npm cache clean --force
 RUN unset NODE_OPTIONS
 

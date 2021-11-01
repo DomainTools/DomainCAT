@@ -8,3 +8,4 @@ scipy
 matplotlib
 pandas
 python-dotenv
+domaintools-api
