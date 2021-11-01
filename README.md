@@ -72,7 +72,9 @@ Build the jupyter notebook container
 
 Run the jupyter notebook
 
-`$ docker run -p 9999:9999 --name domaincat domaincat`
+`$ docker run -p 9999:9999 -v $(PWD)/data:/src/data --name domaincat domaincat`
+
+Mounting the data directory as a volume allows you to add new files to the container without having to rebuild it.
 
 ## Installation Steps: Manual (cross your fingers)
 
