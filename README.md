@@ -113,7 +113,7 @@ ___
 
 October 25, 2021:
 - Initial support for InfraCAT
-- 
+
 August 24, 2021:
 - Adding a way to remove domains in the graph that you aren't interested in (look at the bottom of the notebook)
 - Refactor of the backend data structures to be a bit more efficient
