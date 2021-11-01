@@ -78,7 +78,7 @@ def query_iris_rest_api(api_username_ui, api_pw_ui, domain_list_ui, search_hash_
             partial_domain_list = full_domain_list[start:end]
             # build query string
             domain_list = ",".join(partial_domain_list)
-            iris_query = {"domain": domain_list}
+            iris_query = {"domains": domain_list}
             # query rest api
             print(f"...querying Iris REST API for {len(partial_domain_list)} domains")
             iris_results = api.iris_investigate(**iris_query)
